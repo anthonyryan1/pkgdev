@@ -64,11 +64,20 @@ class Mangler:
 
     @mangle("keywords")
     def _keywords(self, change):
-        """Fix keywords order."""
+        """Fix keywords order and destalbilize new versions."""
+
+        def keywords_remove_stable(kws):
+            return [kw if kw.startswith("~") or kw.startswith("-") else "~" + kw for kw in kws]
+
         lines = change.data.splitlines()
         for i, line in enumerate(lines):
             if mo := keywords_regex.match(line):
-                new_kw = " ".join(sort_keywords(mo.group("keywords").split()))
+                kws = sort_keywords(mo.group("keywords").split())
+                # Only remove stable keywords on new ebuild creations
+                # For our purposes, renames are also new ebuild creations
+                if change.status in ("A", "R"):
+                    kws = keywords_remove_stable(kws)
+                new_kw = " ".join(kws)
                 if not mo.group("quote"):
                     new_kw = f'"{new_kw}"'
                 lines[i] = f"{mo.group('pre')}{new_kw}{mo.group('post')}"
